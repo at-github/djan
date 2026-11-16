@@ -28,18 +28,27 @@ class RedirectionAdminForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         url = cleaned_data.get("destination_url")
-        changed = [param for param in UTM_PARAMS if param in self.changed_data]
-        if not url or not changed:
+        filled = {
+            param: cleaned_data[param] for param in UTM_PARAMS if cleaned_data[param]
+        }
+        cleared = [
+            param
+            for param in UTM_PARAMS
+            if param in self.changed_data and not cleaned_data[param]
+        ]
+        if not url or not (filled or cleared):
             return cleaned_data
 
         parsed = urlparse(url)
         query = QueryDict(parsed.query, mutable=True)
-        for param in changed:
-            if cleaned_data[param]:
-                query[param] = cleaned_data[param]
-            else:
-                query.pop(param, None)
-        url = urlunparse(parsed._replace(query=query.urlencode()))
+        for param in cleared:
+            query.pop(param, None)
+        for param, value in filled.items():
+            query[param] = value
+        new_url = urlunparse(parsed._replace(query=query.urlencode()))
+        if QueryDict(urlparse(new_url).query) == QueryDict(parsed.query):
+            return cleaned_data
+        url = new_url
 
         max_length = Redirection._meta.get_field("destination_url").max_length
         if len(url) > max_length:

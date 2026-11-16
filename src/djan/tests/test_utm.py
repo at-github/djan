@@ -80,20 +80,43 @@ def test_change_redirection_utm_fields(admin_client):
     )
 
 
-def test_change_destination_url_without_touching_utm_fields(admin_client):
+def test_change_destination_url_keeps_utm_fields(admin_client):
     redirection = Redirection.objects.create(
         site_id=1,
         short_url="abc",
-        destination_url="https://www.example.org/?utm_source=mail",
+        destination_url="https://www.example.org/?utm_source=mail&utm_campaign=test",
     )
 
     admin_client.post(
         reverse("admin:djan_redirection_change", args=[redirection.pk]),
         data=form_data(
-            destination_url="https://www.example.org/?utm_source=sms",
+            destination_url="https://www.example.org/autre-page",
             utm_source="mail",
+            utm_campaign="test",
         ),
     )
 
     redirection.refresh_from_db()
-    assert redirection.destination_url == "https://www.example.org/?utm_source=sms"
+    assert (
+        redirection.destination_url
+        == "https://www.example.org/autre-page?utm_campaign=test&utm_source=mail"
+    )
+
+
+def test_unchanged_redirection_keeps_url_as_is(admin_client):
+    redirection = Redirection.objects.create(
+        site_id=1,
+        short_url="abc",
+        destination_url="https://www.example.org/?q=a%20b&utm_source=mail",
+    )
+
+    admin_client.post(
+        reverse("admin:djan_redirection_change", args=[redirection.pk]),
+        data=form_data(destination_url=redirection.destination_url, utm_source="mail"),
+    )
+
+    redirection.refresh_from_db()
+    assert (
+        redirection.destination_url
+        == "https://www.example.org/?q=a%20b&utm_source=mail"
+    )
