@@ -85,6 +85,9 @@ class Redirection(models.Model):
     class Meta:
         unique_together = ("site", "short_url")
 
+    def get_full_short_url(self):
+        return f"https://{self.site.domain}/{self.short_url}"
+
     def get_full_destination(self, source_query_dict):
         if self.params_mode == ParamsMode.IGNORE:
             return self.destination_url
